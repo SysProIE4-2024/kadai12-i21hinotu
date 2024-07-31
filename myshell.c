@@ -77,6 +77,12 @@ void redirect(int fd, char *path, int flag) {   // リダイレクト処理を�
   //        入力の場合 O_RDONLY
   //        出力の場合 O_WRONLY|O_TRUNC|O_CREAT
   //
+  close(fd);
+  int fd2 =open(path,flag,0644);
+  if (fd2 != fd) {
+    fprintf(stderr, "something is wrong\n");
+    exit (1);
+  }
 }
 
 void externalCom(char *args[]) {                // 外部コマンドを実行する
@@ -85,7 +91,13 @@ void externalCom(char *args[]) {                // 外部コマンドを実行�
     perror("fork");                             //     fork 失敗
     exit(1);                                    //     非常事態，親を終了
   }
-  if (pid==0) {                                 //   子プロセスなら
+  if (pid==0) { 
+    if (ofile != NULL) {
+      redirect(1,ofile,O_WRONLY|O_TRUNC|O_CREAT);
+    } 
+    if (ifile != NULL) {
+      redirect(0,ifile,O_RDONLY); 
+    }                                //   子プロセスなら
     execvp(args[0], args);                      //     コマンドを実行
     perror(args[0]);
     exit(1);
@@ -130,3 +142,44 @@ int main() {
   return 0;
 }
 
+/*実行結果
+コンパイル：
+% make
+cc -D_GNU_SOURCE -Wall -std=c99 -o myshell myshell.c
+
+出力：
+Command: ls
+Makefile	README.md	README.pdf	a.txt		myshell		myshell.c
+Command: ls > a.txt
+Command: cat a.txt
+Makefile
+README.md
+README.pdf
+a.txt
+myshell
+myshell.c
+
+出力上書き：
+Command: date 
+2024年 7月31日 水曜日 22時20分21秒 JST
+Command: date > a.txt
+Command: cat a.txt
+2024年 7月31日 水曜日 22時20分27秒 JST
+
+出力エラー：
+Command: date > /a.txt
+something is wrong
+
+入力：
+ls > a.txt
+Command: ls
+Makefile	README.md	README.pdf	a.txt		myshell		myshell.c
+Command: grep .c < a.txt
+myshell.c
+
+入力エラー(a.txtを消去済)：
+Command: a.txt
+a.txt: No such file or directory
+Command: grep .txt < a.txt
+something is wrong
+*/
